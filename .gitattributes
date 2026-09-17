@@ -37,3 +37,9 @@
 *.fbx binary
 *.mp4 binary
 *.ogv binary
+
+# Web export artifacts. `* text=auto eol=lf` above would rewrite the bytes of a
+# .pck that git's heuristic mistakes for text, and the browser then fails to load
+# it. Mark them binary explicitly so they are stored byte for byte.
+*.pck binary
+*.wasm binary

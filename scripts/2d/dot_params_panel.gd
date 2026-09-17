@@ -1,8 +1,8 @@
 # scripts/2d/dot_params_panel.gd
 # Live sliders for every parameter of the chasing dot.
 #
-# The rows are generated from ChaserSettings' exported floats, so a new export
-# there becomes a slider here automatically. Dragging one writes to the shared
+# The rows are generated from ChaserSettings' exported numbers, so a new export
+# there becomes a slider here automatically (ints snap to whole numbers). Dragging one writes to the shared
 # resource and emits its `changed` signal, which the spawner turns into a live
 # update on the dot currently in flight.
 #
@@ -21,6 +21,8 @@ const ROW_SEPARATION: int = 8
 ## Row height. The slider is stretched to this, so the whole row is a hit area
 ## instead of the thin strip a slider asks for by default.
 const ROW_HEIGHT: float = 30.0
+const HINT_COLOR: Color = Color(1.0, 1.0, 1.0, 0.55)
+const TITLE: String = "Dot parameters"
 const NAME_WIDTH: float = 210.0
 const SLIDER_WIDTH: float = 230.0
 const VALUE_WIDTH: float = 74.0
@@ -37,12 +39,19 @@ var _settings: ChaserSettings = null
 var _defaults: ChaserSettings = null
 var _sliders: Dictionary[String, HSlider] = {}
 var _value_labels: Dictionary[String, Label] = {}
+## Properties that are whole numbers in the resource. A slider is a float whatever
+## it drives, so these are the rows that have to be rounded on the way in.
+var _int_properties: Dictionary[String, bool] = {}
+var _header: Button = null
+var _body: VBoxContainer = null
 
 
 func _ready() -> void:
-	# Fill the viewport but let clicks pass through to whatever is behind: only
-	# the panel's own controls should consume input.
-	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# Sized outright, not anchored: for a Control whose parent is a Node2D the
+	# anchorable parent rect is empty, so anchors would collapse this to zero.
+	# Filling the screen only matters for click-through bookkeeping - the panel's
+	# own controls carry its real hit areas.
+	size = get_viewport_rect().size
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if spawner == null or spawner.settings == null:
 		push_warning("DotParamsPanel: spawner or its settings are missing, no panel built.")
@@ -69,37 +78,99 @@ func _build_panel() -> void:
 	column.add_theme_constant_override("separation", ROW_SEPARATION)
 	margin.add_child(column)
 
-	var title: Label = Label.new()
-	title.text = "Dot parameters"
-	title.add_theme_font_size_override("font_size", TITLE_FONT_SIZE)
-	column.add_child(title)
+	# Only the header is always there; everything else lives in the body, so the
+	# panel can collapse to a title bar instead of covering the playfield.
+	var header: Button = Button.new()
+	header.name = "Header"
+	header.toggle_mode = true
+	header.button_pressed = true
+	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Never focusable: a focused button swallows the dash key, so pressing space
+	# would expand or collapse this panel instead of dodging.
+	header.focus_mode = Control.FOCUS_NONE
+	header.add_theme_font_size_override("font_size", TITLE_FONT_SIZE)
+	column.add_child(header)
+	_header = header
+
+	var body: VBoxContainer = VBoxContainer.new()
+	body.name = "Body"
+	body.add_theme_constant_override("separation", ROW_SEPARATION)
+	column.add_child(body)
+	_body = body
 
 	var hint: Label = Label.new()
 	hint.text = "Applies to the dot in flight and every later one."
-	hint.modulate = Color(1.0, 1.0, 1.0, 0.55)
-	column.add_child(hint)
-	column.add_child(HSeparator.new())
+	hint.modulate = HINT_COLOR
+	body.add_child(hint)
 
-	for info: Dictionary in _settings.get_property_list():
-		# One slider per exported float. Anything without a range hint is skipped
-		# so a plain float export can never produce a broken control.
-		if int(info["type"]) != TYPE_FLOAT:
+	var pick_hint: Label = Label.new()
+	pick_hint.text = "Left-click a circle to target it. Space makes it dodge."
+	pick_hint.modulate = HINT_COLOR
+	body.add_child(pick_hint)
+	body.add_child(HSeparator.new())
+
+	# The script's own property list, not Resource's: the latter also reports a
+	# "Resource" group, which would show up here as a section heading.
+	var properties: Array[Dictionary] = []
+	var settings_script: GDScript = _settings.get_script() as GDScript
+	if settings_script != null:
+		properties = settings_script.get_script_property_list()
+
+	for info: Dictionary in properties:
+		var usage: int = int(info["usage"])
+		if usage & PROPERTY_USAGE_GROUP:
+			# Export groups become section headings, so the controls stay sorted
+			# the way they are declared in ChaserSettings.
+			var section: String = String(info["name"])
+			if not section.is_empty():
+				body.add_child(_make_section_label(section))
+			continue
+		# One slider per exported number. Floats and range-hinted ints both build a
+		# row; anything without a range hint is skipped, so a bool, a Color or a
+		# plain float can never produce a broken control.
+		var value_type: int = int(info["type"])
+		if value_type != TYPE_FLOAT and value_type != TYPE_INT:
 			continue
 		if int(info["hint"]) != PROPERTY_HINT_RANGE:
 			continue
-		if not (int(info["usage"]) & PROPERTY_USAGE_EDITOR):
+		if not (usage & PROPERTY_USAGE_EDITOR):
 			continue
-		column.add_child(_build_row(String(info["name"]), String(info["hint_string"])))
+		body.add_child(_build_row(
+			String(info["name"]), String(info["hint_string"]), value_type == TYPE_INT
+		))
 
-	column.add_child(HSeparator.new())
+	body.add_child(HSeparator.new())
 	var reset: Button = Button.new()
 	reset.name = "Reset"
 	reset.text = "Reset to defaults"
+	reset.focus_mode = Control.FOCUS_NONE
 	reset.pressed.connect(_on_reset_pressed)
-	column.add_child(reset)
+	body.add_child(reset)
+
+	header.toggled.connect(_on_header_toggled)
+	_refresh_header(true)
 
 
-func _build_row(property: String, hint_string: String) -> HBoxContainer:
+func _on_header_toggled(expanded: bool) -> void:
+	_body.visible = expanded
+	_refresh_header(expanded)
+
+
+## The mark doubles as the state read-out and is deliberately plain ASCII: the
+## default theme font is not guaranteed to carry arrow glyphs.
+func _refresh_header(expanded: bool) -> void:
+	_header.text = ("- " if expanded else "+ ") + TITLE
+
+
+func _make_section_label(section: String) -> Label:
+	var label: Label = Label.new()
+	label.text = section
+	label.modulate = HINT_COLOR
+	label.add_theme_font_size_override("font_size", TITLE_FONT_SIZE - 4)
+	return label
+
+
+func _build_row(property: String, hint_string: String, is_int: bool) -> HBoxContainer:
 	var row: HBoxContainer = HBoxContainer.new()
 	row.name = "row_" + property
 	row.add_theme_constant_override("separation", ROW_SEPARATION)
@@ -114,9 +185,16 @@ func _build_row(property: String, hint_string: String) -> HBoxContainer:
 	var bounds: PackedStringArray = hint_string.split(",")
 	var slider: HSlider = HSlider.new()
 	slider.name = "slider_" + property
+	slider.focus_mode = Control.FOCUS_NONE
 	slider.min_value = float(bounds[0])
 	slider.max_value = float(bounds[1])
 	slider.step = float(bounds[2]) if bounds.size() > 2 else 0.01
+	if is_int:
+		# A whole-number parameter (the round length) snaps to whole numbers: the
+		# slider is still a float under the hood, so the step is what stops a drag
+		# from handing the resource 4.7 dots.
+		slider.step = 1.0
+		_int_properties[property] = true
 	slider.custom_minimum_size.x = SLIDER_WIDTH
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	# Stretch to the row's height so the drawn track sits on the same line as the
@@ -141,7 +219,7 @@ func _build_row(property: String, hint_string: String) -> HBoxContainer:
 
 
 func _on_slider_changed(value: float, property: String) -> void:
-	_settings.set(property, value)
+	_write_value(property, value)
 	_settings.emit_changed()
 	_refresh_value_text(property, value)
 
@@ -151,9 +229,19 @@ func _on_reset_pressed() -> void:
 		var slider: HSlider = _sliders[property]
 		var value: float = float(_defaults.get(property))
 		slider.set_value_no_signal(value)
-		_settings.set(property, value)
+		_write_value(property, value)
 		_refresh_value_text(property, value)
 	_settings.emit_changed()
+
+
+## Writes one slider's value into the shared resource. A slider is a float
+## whatever it drives, so an int parameter is rounded into it rather than assigned
+## as a float: the resource would reject a count of 4.7.
+func _write_value(property: String, value: float) -> void:
+	if _int_properties.get(property, false):
+		_settings.set(property, roundi(value))
+		return
+	_settings.set(property, value)
 
 
 func _refresh_value_text(property: String, value: float) -> void:

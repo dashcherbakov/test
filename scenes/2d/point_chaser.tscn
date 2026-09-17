@@ -1,42 +1,78 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene format=3 uid="uid://clot4ef7q0w73"]
 
-[ext_resource type="Script" path="res://scripts/2d/chaser_spawner.gd" id="1_spawner"]
-[ext_resource type="Script" path="res://scripts/2d/target_circle.gd" id="2_target"]
+[ext_resource type="Script" uid="uid://n136kl3iria4" path="res://scripts/2d/chaser_spawner.gd" id="1_spawner"]
+[ext_resource type="Script" uid="uid://cjvkabdrq81bg" path="res://scripts/2d/target_circle.gd" id="2_target"]
 [ext_resource type="PackedScene" path="res://scenes/2d/chaser_point.tscn" id="3_point"]
 [ext_resource type="Resource" path="res://data/chaser_settings.tres" id="4_settings"]
-[ext_resource type="Script" path="res://scripts/2d/dot_params_panel.gd" id="5_panel"]
+[ext_resource type="Script" uid="uid://gmapckx0bdd" path="res://scripts/2d/dot_params_panel.gd" id="5_panel"]
+[ext_resource type="Script" uid="uid://bncx68q84mtaf" path="res://scripts/2d/map_bounds.gd" id="6_bounds"]
+[ext_resource type="Script" uid="uid://b0171sd4nyave" path="res://scripts/2d/startup_screen.gd" id="7_startup"]
+[ext_resource type="Script" path="res://scripts/2d/score_hud.gd" id="8_hud"]
+[ext_resource type="Script" path="res://scripts/2d/game_over_screen.gd" id="9_gameover"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_target"]
 radius = 60.0
 
-[node name="PointChaser" type="Node2D"]
+[sub_resource type="CircleShape2D" id="CircleShape2D_target2"]
+radius = 60.0
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="PointChaser" type="Node2D" unique_id=627250150]
+
+[node name="Background" type="ColorRect" parent="." unique_id=1135290792]
 offset_right = 1920.0
 offset_bottom = 1080.0
+mouse_filter = 2
 color = Color(0.07, 0.08, 0.11, 1)
 
-[node name="TargetCircle" type="Area2D" parent="."]
-script = ExtResource("2_target")
+[node name="MapBounds" type="Node2D" parent="." unique_id=822130681 groups=["map_bounds"]]
+script = ExtResource("6_bounds")
+
+[node name="TargetCircle" type="Area2D" parent="." unique_id=1022883946 groups=["target_circles"]]
 position = Vector2(960, 540)
-collision_layer = 1
 collision_mask = 2
 monitorable = false
+script = ExtResource("2_target")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="TargetCircle"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TargetCircle" unique_id=229272975]
 shape = SubResource("CircleShape2D_target")
 
-[node name="Spawner" type="Node2D" parent="." node_paths=PackedStringArray("target")]
+[node name="TargetCircle2" type="Area2D" parent="." unique_id=190998600 groups=["target_circles"]]
+position = Vector2(1520, 300)
+collision_mask = 2
+monitorable = false
+script = ExtResource("2_target")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TargetCircle2" unique_id=2066680608]
+shape = SubResource("CircleShape2D_target2")
+
+[node name="Spawner" type="Node2D" parent="." unique_id=1952889221 node_paths=PackedStringArray("target")]
 script = ExtResource("1_spawner")
 point_scene = ExtResource("3_point")
 target = NodePath("../TargetCircle")
 settings = ExtResource("4_settings")
-min_spawn_distance = 420.0
 debug_trace = true
 
-[node name="ParamsPanel" type="Control" parent="." node_paths=PackedStringArray("spawner")]
+[node name="ParamsPanel" type="Control" parent="." unique_id=178808119 node_paths=PackedStringArray("spawner")]
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
 script = ExtResource("5_panel")
 spawner = NodePath("../Spawner")
-anchor_right = 1.0
-anchor_bottom = 1.0
+
+[node name="ScoreHud" type="Control" parent="." node_paths=PackedStringArray("spawner")]
+layout_mode = 3
+anchors_preset = 0
 mouse_filter = 2
+script = ExtResource("8_hud")
+spawner = NodePath("../Spawner")
+
+[node name="StartupScreen" type="Control" parent="." unique_id=1303166433]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("7_startup")
+
+[node name="GameOverScreen" type="Control" parent="." node_paths=PackedStringArray("spawner")]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("9_gameover")
+spawner = NodePath("../Spawner")

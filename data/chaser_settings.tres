@@ -10,3 +10,6 @@ max_speed = 800.0
 speed_bleed_per_second = 0.088
 linear_damp = 0.05
 radius = 8.0
+points_per_second = 10.0
+rate_gain_per_second = 4.0
+max_dots = 5

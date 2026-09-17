@@ -1,7 +1,8 @@
 # scripts/2d/chaser_point.gd
 # An inertial seeker: a heavy RigidBody2D that applies a fixed thrust toward its
 # target. It cannot turn instantly, so a deviating target makes it overshoot,
-# orbit, and spiral inward until contact.
+# orbit, and spiral inward until contact. Retargeting it mid-flight makes it
+# curve toward the new circle with all of that inertia still in play.
 #
 # mass, linear_damp, linear_damp_mode, gravity_scale, can_sleep and lock_rotation
 # are native RigidBody2D properties and are therefore configured in
@@ -43,9 +44,22 @@ func _ready() -> void:
 	_speed_ceiling = max_speed
 
 
-## Caches the target reference once, so the physics loop never walks the tree.
-func setup(target: Node2D) -> void:
+## Points the dot at a target and caches the reference, so the physics loop never
+## walks the tree. Safe to call mid-flight: this is how clicking another circle
+## retargets the dot that is already in the air.
+##
+## Retargeting also restores the starting motion state. The speed ceiling a dot
+## spirals in from bleeds away over its life, so a switch hands it a fresh one and
+## the dot sets off at its initial parameters instead of half spent.
+func set_target(target: Node2D) -> void:
 	_target = target
+	_speed_ceiling = max_speed
+
+
+## How much of its top speed the dot still has. It bleeds down over a life, which
+## is what tightens the loops, so this reads out how spent a seeker is.
+func get_speed_ceiling() -> float:
+	return _speed_ceiling
 
 
 ## Stamps a settings resource onto this dot. Called once at spawn and again every
