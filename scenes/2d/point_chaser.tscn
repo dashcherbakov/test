@@ -1,0 +1,42 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/2d/chaser_spawner.gd" id="1_spawner"]
+[ext_resource type="Script" path="res://scripts/2d/target_circle.gd" id="2_target"]
+[ext_resource type="PackedScene" path="res://scenes/2d/chaser_point.tscn" id="3_point"]
+[ext_resource type="Resource" path="res://data/chaser_settings.tres" id="4_settings"]
+[ext_resource type="Script" path="res://scripts/2d/dot_params_panel.gd" id="5_panel"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_target"]
+radius = 60.0
+
+[node name="PointChaser" type="Node2D"]
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1920.0
+offset_bottom = 1080.0
+color = Color(0.07, 0.08, 0.11, 1)
+
+[node name="TargetCircle" type="Area2D" parent="."]
+script = ExtResource("2_target")
+position = Vector2(960, 540)
+collision_layer = 1
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TargetCircle"]
+shape = SubResource("CircleShape2D_target")
+
+[node name="Spawner" type="Node2D" parent="." node_paths=PackedStringArray("target")]
+script = ExtResource("1_spawner")
+point_scene = ExtResource("3_point")
+target = NodePath("../TargetCircle")
+settings = ExtResource("4_settings")
+min_spawn_distance = 420.0
+debug_trace = true
+
+[node name="ParamsPanel" type="Control" parent="." node_paths=PackedStringArray("spawner")]
+script = ExtResource("5_panel")
+spawner = NodePath("../Spawner")
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ChaserSettings" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/2d/chaser_settings.gd" id="1_settings"]
+
+[resource]
+script = ExtResource("1_settings")
+mass = 4.0
+thrust = 6100.0
+max_speed = 800.0
+speed_bleed_per_second = 0.088
+linear_damp = 0.05
+radius = 8.0
