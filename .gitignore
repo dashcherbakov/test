@@ -10,7 +10,6 @@
 *.x86_32
 *.arm32
 *.arm64
-*.pck
 *.zip
 export/
 
